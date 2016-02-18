@@ -15,6 +15,7 @@ int main()
 
         //CAPTURING FRAMES FROM CAMERA
         while( true ){
+            
             Mat src;
             stream.read(src);
 
