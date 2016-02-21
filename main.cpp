@@ -1,20 +1,25 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <iostream>
+#include "csvparser/csvparser.h"
 
 #define X_ROI 10
 #define Y_ROI 10
 #define WIDTH 40
 #define HEIGHT 40
 
-int fiducial[3][2] = {
+float fiducial[3][2] = {
         {172, 447} ,
         {512, 446} ,
         {503, 14}
 };
 
 
-int locateFiducial(int target_x, int target_y, int* fiducial_x, int* fiducial_y, int* fiducial_r);
+
+float data[3][2] = {0};
+
+
+int locateFiducial(float target_x, float target_y, float* fiducial_x, float* fiducial_y, float* fiducial_r);
 void rigidTransform(cv::Mat A, cv::Mat B, cv::Mat& R, cv::Mat& t);
 
 using namespace cv;
@@ -22,21 +27,35 @@ using namespace std;
 
 int main()
 {
-
     int fidNum, i;
     fidNum = sizeof(fiducial)/sizeof(fiducial[0]);
     for (i = 0; i<fidNum; i++)
     {
-        int fid_x, fid_y, fid_r;
+        float fid_x, fid_y, fid_r;
         locateFiducial(fiducial[i][0],fiducial[i][1],&fid_x,&fid_y,&fid_r);
+        data[i][0]= fid_x;
+        data[i][1]= fid_y;
         cout << "Fiducial #" << i+1 << ": x:" << fid_x << " y:" << fid_y <<  "\n======================\n";
     }
+
+    Mat A, B, R, t;
+    A = Mat(3, 2, CV_32F, fiducial);
+    B = Mat(3, 2, CV_32F, data);
+    rigidTransform(A,B,R,t);
+
+    cout << "R = "<< endl << " "  << R << endl << endl;
+    cout << "t = "<< endl << " "  << t << endl << endl;
+
+
+
+
+
     //waitKey();
     return 0;
 
 }
 
-int locateFiducial(int target_x, int target_y, int* fiducial_x, int* fiducial_y, int* fiducial_r)
+int locateFiducial(float target_x, float target_y, float* fiducial_x, float* fiducial_y, float* fiducial_r)
 {
     VideoCapture stream(0);
 
@@ -47,8 +66,8 @@ int locateFiducial(int target_x, int target_y, int* fiducial_x, int* fiducial_y,
         while (true)
         {
             // Disable autofocus and set a manual value
-            system("v4l2-ctl -d 0 -c focus_auto=0");
-            system("v4l2-ctl -d 0 -c focus_absolute=30");
+            //system("v4l2-ctl -d 0 -c focus_auto=0");
+            //system("v4l2-ctl -d 0 -c focus_absolute=30");
 
             // Capture a frame from the stream
             Mat src;
