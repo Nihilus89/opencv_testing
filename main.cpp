@@ -1,12 +1,23 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include "csvparser/csvparser.h"
+#include "mic488.h"
 #include <iostream>
-//#include "csvparser/csvparser.h"
 
 #define X_ROI 10
 #define Y_ROI 10
 #define WIDTH 40
 #define HEIGHT 40
+
+#define MB_BITRATE 38400
+#define MB_DATABITS 8
+#define MB_STOPBITS 1
+#define MB_PARITY 'N'
+
+#define PICK_X 10
+#define PICK_Y 5
+
+modbus_t *topTable;
 
 float fiducial[3][2] = {
         {172, 447} ,
@@ -25,28 +36,76 @@ void rigidTransform(cv::Mat A, cv::Mat B, cv::Mat& R, cv::Mat& t);
 using namespace cv;
 using namespace std;
 
-int main()
+int main(int argc, char *argv[])
 {
-    int fidNum, i;
-    fidNum = sizeof(fiducial)/sizeof(fiducial[0]);
+    char* filename = argv[1]; // Save the calling argument (.csv filename)
+
+    /************************************************
+    *           Controller initilization
+    *************************************************
+    */
+
+    topTable = modbus_new_rtu("/dev/ttyUSB0", MB_BITRATE, MB_PARITY, MB_DATABITS, MB_STOPBITS); // 38400 bps, 8-N-1
+    initController(topTable, 1); // table, slave address
+    initMotors(topTable);
+    // doHoming(topTable); doHoming(bottomTable) // To be created when the physical setup is done and can experiment with
+                                                //  the stop switches etc. Homing place at the very beginning of the code
+                                                //  so the time will be managed more efficiently
+
+    /*************************************************
+     *                  CSV parsing
+     *************************************************
+     */
+    // Construct the parser
+    CsvParser *csvparser = CsvParser_new(filename, ",", 1);
+    CsvRow *header;
+    CsvRow *row;
+    // Get the number of rows (essentially the number of parts)
+    int numRows = CsvParser_getNumRows(filename)-2,i = 0;
+    // Extract the headers
+    header = CsvParser_getHeader(csvparser);
+    if (header == NULL) {
+        printf("%s\n", CsvParser_getErrorMessage(csvparser));
+        return 1;
+    }
+    // Parse the .csv file and store the coordinates
+    float coordinates[numRows][2]; // the variable holding the coordinates
+    while ((row = CsvParser_getRow(csvparser)) ) {
+        char **rowFields = CsvParser_getFields(row);
+        coordinates[i][0] = (float)atof(rowFields[6]); // Center-x
+        coordinates[i][1] = (float)atof(rowFields[7]); // Center-y
+        printf("x:%f y:%f\n", coordinates[i][0], coordinates[i][1]);
+        i++;
+        CsvParser_destroy_row(row);
+    }
+    CsvParser_destroy(csvparser); // destroy the parser
+
+
+    /*************************************************
+     *                 Visual alignment
+     *************************************************
+     */
+    int fidNum;
+    fidNum = sizeof(fiducial)/sizeof(fiducial[0]); // The number of fiducial markers
     for (i = 0; i<fidNum; i++)
     {
         float fid_x, fid_y, fid_r;
-        locateFiducial(fiducial[i][0],fiducial[i][1],&fid_x,&fid_y,&fid_r);
+        // Call the locate fiducial function with the "correct" fiducial position to place the ROIs
+        locateFiducial(fiducial[i][0],fiducial[i][1],&fid_x,&fid_y,&fid_r); // "Correct" fiducial - x, "correct fiducial - y
+                                                                            // detected fiducial - x, detected fiducial - y
+                                                                            // detected fiducial radius
         data[i][0]= fid_x;
         data[i][1]= fid_y;
         cout << "Fiducial #" << i+1 << ": x:" << fid_x << " y:" << fid_y <<  "\n======================\n";
     }
-
-    Mat A, B, R, t;
-    A = Mat(3, 2, CV_32F, fiducial);
-    B = Mat(3, 2, CV_32F, data);
-    rigidTransform(A,B,R,t);
+    // Assign the values to matrices so the rigid transform can be performed
+    Mat correctFiducial, currentFiducial, R, t;
+    correctFiducial = Mat(3, 2, CV_32F, fiducial);
+    currentFiducial = Mat(3, 2, CV_32F, data);
+    rigidTransform(correctFiducial,currentFiducial,R,t); // Get the R and t matrices from the rigid transform
 
     cout << "R = "<< endl << " "  << R << endl << endl;
     cout << "t = "<< endl << " "  << t << endl << endl;
-
-
 
 
 
