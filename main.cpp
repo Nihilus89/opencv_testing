@@ -1,7 +1,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <iostream>
-#include "csvparser/csvparser.h"
+//#include "csvparser/csvparser.h"
 
 #define X_ROI 10
 #define Y_ROI 10
@@ -66,21 +66,21 @@ int locateFiducial(float target_x, float target_y, float* fiducial_x, float* fid
         while (true)
         {
             // Disable autofocus and set a manual value
-            //system("v4l2-ctl -d 0 -c focus_auto=0");
-            //system("v4l2-ctl -d 0 -c focus_absolute=30");
+            system("v4l2-ctl -d 0 -c focus_auto=0");
+            system("v4l2-ctl -d 0 -c focus_absolute=30");
 
             // Capture a frame from the stream
             Mat src;
             stream.read(src);
 
             // The x,y coordinates of the ROI's starting point
-            int x_roi = target_x - X_ROI, y_roi = target_y - Y_ROI;
+            float x_roi = target_x - X_ROI, y_roi = target_y - Y_ROI;
 
             // Uncomment for saving the frame to disk
             //imwrite( "/home/vassilis/Dropbox/Uppsala Universitet/Thesis/Selective-soldering-PC/opencv_board.jpg", src );
 
             // Create the ROI and crop the frame
-            Rect region_of_interest = Rect(x_roi, y_roi, WIDTH, HEIGHT);
+            Rect region_of_interest = Rect((int)x_roi,(int) y_roi, WIDTH, HEIGHT);
             Mat roi = src(region_of_interest);
 
             // Convert to grayscale and perform edge detection
@@ -94,8 +94,8 @@ int locateFiducial(float target_x, float target_y, float* fiducial_x, float* fid
             // Display the circles
             for (size_t i = 0; i < circles.size(); i++) {
                 Vec3i c = circles[i];
-                circle(src, Point(c[0] + x_roi, c[1] + y_roi), c[2], Scalar(0, 0, 255), 3, LINE_AA); // +x_roi and +y_roi for displaying using the whole's frame
-                circle(src, Point(c[0] + x_roi, c[1] + y_roi), 2, Scalar(0, 255, 0), 3, LINE_AA);   // coordinates rather than the ROI's ones (local)
+                circle(src, Point((int)c[0] + (int)x_roi, (int)c[1] + (int)y_roi), c[2], Scalar(0, 0, 255), 3, LINE_AA); // +x_roi and +y_roi for displaying using the whole's frame
+                circle(src, Point((int)c[0] + (int)x_roi, (int)c[1] + (int)y_roi), 2, Scalar(0, 255, 0), 3, LINE_AA);   // coordinates rather than the ROI's ones (local)
                 // Return values
                 *fiducial_x = c[0] + x_roi;
                 *fiducial_y = c[1] + y_roi;
@@ -159,7 +159,7 @@ void rigidTransform(cv::Mat A, cv::Mat B, cv::Mat& R, cv::Mat& t)
     s.compute(H,S,U,V); // Compute SVD
 
     // We get S as a single column, put the values at a diagonal to match MATLAB's results
-    S = Mat::diag(S);
+    //S = Mat::diag(S); // Commented out as it is not (currently) used
 
     // Negate U(:,1) to match MATLAB's results
     temp = U.col(0);
